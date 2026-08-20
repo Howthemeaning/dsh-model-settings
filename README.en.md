@@ -14,6 +14,8 @@ Each slot sets its own **provider / model / reasoning effort** independently —
 
 Two actions, kept distinct: **Apply globally** writes the config and switches the current conversation; **Apply to this conversation only** switches just the current session without writing config.
 
+![Model Settings panel](docs/dsh-model-settings.png)
+
 ## Origin
 
 This plugin was born from a real billing accident.
@@ -51,6 +53,28 @@ Each slot sets its own **provider / model / reasoning effort**, or follows the d
 
 **Hot reload**: no dsh restart needed. New sessions use the new main model; the next subagent request or goal round in a running session uses the new config.
 
+## Requirements
+
+- **dsh web profile**: the panel is web-side UI (`dsh.client.platform: "web"`) and only loads under a web profile.
+- **Peer dependencies**:
+
+  | Package | Range |
+  | --- | --- |
+  | `@deepseek-ai/cordis` | `^4.0.1` |
+  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.2.0` |
+  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.2.0` |
+  | `@deepseek-ai/schemastery` | `>=0.0.1-rc.1 <0.2.0` |
+
+- **Required host services**: `agents`, `webServer` (server side); `slots`, `locale` (client side).
+- **Optional services** — when absent the matching capability degrades instead of crashing:
+
+  | Service | When absent |
+  | --- | --- |
+  | `settings` | Panel is read-only; saving returns `settings service unavailable` |
+  | `llm` | Empty model catalog; the panel shows "No configurable model providers" |
+  | `agentDefaultModel` | Current default is unreadable; the main route shows "Not configured" |
+  | `goals` | The goal slot has no effect; the other two work normally |
+
 ## Installation
 
 ### Standard install (recommended)
@@ -68,7 +92,59 @@ dsh plugin --profile web add github:Howthemeaning/dsh-model-settings
 dsh plugin --profile web remove dsh-model-settings
 ```
 
-Or manually: remove the model-settings block from `~/.dsh/profiles/web/cordis.patch.yml`, then delete `~/.dsh/profiles/node_modules/dsh-model-settings`.
+Or manually: remove `dsh-model-settings` from both the `dsh.profile.bundles` array and `dependencies` in `~/.dsh/profiles/web/package.json`, then delete `~/.dsh/profiles/web/node_modules/dsh-model-settings`.
+
+## Configuration
+
+Day to day, just open the panel — it writes the settings *user* layer, which takes precedence over the defaults below.
+
+To pre-seed defaults at deploy time (say, pinning every subagent to a cheaper model across a team), override this plugin's `config` with an `update` entry in the profile's `~/.dsh/profiles/web/cordis.patch.yml`:
+
+```yaml
+- update:
+    - id: model-settings
+      config:
+        subagent:
+          provider: deepseek-official
+          model: deepseek-v4-flash
+          reasoningEffort: low
+```
+
+Two optional slots, same fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `subagent` | object | Override for subagents (workflow children included); omit to follow the default |
+| `goal` | object | Override for rounds while a goal is active; omit to follow the default |
+| `<slot>.provider` | string | Provider id, matching the panel's "Provider" dropdown |
+| `<slot>.model` | string | Model id |
+| `<slot>.reasoningEffort` | string | Reasoning effort id; omit to use the model's own default |
+
+The main-model slot is not configured here — it writes the `agent-default-model` namespace, owned by the panel or by dsh's own settings.
+
+## Development
+
+This package is hand-written ESM with no build step: `lib/index.js` is the host half, `lib/client.js` the browser half (a hand-written `__ModuleLoader__` bundle with the CSS inlined).
+
+The peer dependencies ship with the dsh CLI, so point `node_modules` at them for local work:
+
+```bash
+ln -sfn "$(npm root -g)/@deepseek-ai/dsh/node_modules" node_modules
+npm run check
+```
+
+| Command | What it does |
+| --- | --- |
+| `npm run build` | Verifies every published artifact exists and `node --check`s both js files (no transpile) |
+| `npm run check` | `build`, then `test/smoke.mjs` |
+
+`test/smoke.mjs` mocks a minimal cordis ctx and covers the `agent/request` slot precedence plus all three endpoints. Two more scripts are investigation tools, not part of `check`: `test/read-log.mjs` decompresses a session log and prints its `request/header` entries, and `test/render-debug.mjs` force-renders the panel under node to reproduce crashes.
+
+After editing `lib/client.js`, sync it to the installed copy and hard-reload the page to see the change (the CSS is injected into a `<style>` tag on first load; no dsh restart needed):
+
+```bash
+cp lib/client.js ~/.dsh/profiles/web/node_modules/dsh-model-settings/lib/client.js
+```
 
 ## License
 

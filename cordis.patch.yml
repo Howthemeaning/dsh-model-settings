@@ -1,0 +1,4 @@
+# dsh-model-settings: 模型设置面板（左下角，热更新）
+- insert:
+    - id: model-settings
+      name: dsh-model-settings

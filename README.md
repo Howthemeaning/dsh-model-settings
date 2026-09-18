@@ -47,6 +47,11 @@
 
 **热更新**：保存后无需重启 dsh。新会话用新主模型，已运行会话的下一次子代理请求、下一个 goal 回合立即用新配置。
 
+## 兼容性
+
+- 当前代码适配新版 dsh-settings API（`SettingsProvider` / `ctx.settings.installSection`），已在 dsh **0.1.5-rc.2** 上实测通过（插件可正常加载，`/api/model-settings/state` 等端点工作正常）。
+- 如果你的 dsh 较旧（`@deepseek-ai/dsh-settings` 仍导出 `settingsNamespace` / `installSettingsSection`），请使用本插件 **0.1.0** 的代码。
+
 ## 安装
 
 ### 标准安装（推荐）

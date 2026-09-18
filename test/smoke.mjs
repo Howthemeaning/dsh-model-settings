@@ -11,7 +11,7 @@
  *   5. /state exposes the model catalog with reasoning efforts
  *
  * Run with the project's node_modules junctioned to the dsh profile's
- * node_modules so @deepseek-ai/dsh-settings etc. resolve.
+ * node_modules so @deepseek-ai/schemastery etc. resolve.
  */
 import assert from "node:assert/strict";
 import { apply } from "../lib/index.js";
@@ -75,6 +75,15 @@ function createSettings(initial = {}) {
 					return () => watchers.delete(fn);
 				}
 			};
+		},
+		installSection(owner, ns, schema, entry, hooks) {
+			const key = String(ns);
+			if (!documents.has(key)) documents.set(key, { value: {}, base: entry, revision: revision++ });
+			const scope = {
+				get: () => ({ ...entry, ...documents.get(key).value })
+			};
+			hooks.setSource(() => scope.get());
+			hooks.onChange();
 		},
 		async replace(ns, section) {
 			const key = String(ns);

@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-settings",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "模型设置面板：统一设置主模型、子代理、goal 回合的模型与推理强度，保存即热更新（dsh sidebar footer action）",
   "private": true,
   "type": "module",

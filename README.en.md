@@ -51,6 +51,11 @@ Each slot sets its own **provider / model / reasoning effort**, or follows the d
 
 **Hot reload**: no dsh restart needed. New sessions use the new main model; the next subagent request or goal round in a running session uses the new config.
 
+## Compatibility
+
+- The current code targets the new dsh-settings API (`SettingsProvider` / `ctx.settings.installSection`) and has been verified on dsh **0.1.5-rc.2** (plugin loads cleanly and the `/api/model-settings/state` endpoints work).
+- If your dsh is older (`@deepseek-ai/dsh-settings` still exports `settingsNamespace` / `installSettingsSection`), use version **0.1.0** of this plugin instead.
+
 ## Installation
 
 ### Standard install (recommended)

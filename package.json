@@ -1,8 +1,7 @@
 {
   "name": "dsh-model-settings",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "模型设置面板：统一设置主模型、子代理、goal 回合的模型与推理强度，保存即热更新（兼容最新 dsh 0.2.1-rc.2 / DSH NEXT，并向下兼容 0.1.x）",
-  "private": true,
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

@@ -10,11 +10,17 @@
  *      target agent's own requests (child requests pass through)
  *   5. /state exposes the model catalog with reasoning efforts
  *
- * Run with the project's node_modules junctioned to the dsh profile's
- * node_modules so @deepseek-ai/schemastery etc. resolve.
+ * Run with the project's node_modules junctioned to a dsh installation so
+ * @deepseek-ai/dsh-settings etc. resolve. The same file exercises all three
+ * settings generations: it detects the installed exports and the mock provides
+ * the matching entry point (installSettingsSection / installSection / forms).
  */
 import assert from "node:assert/strict";
+import * as dshSettings from "@deepseek-ai/dsh-settings";
 import { apply } from "../lib/index.js";
+
+const formsHost = typeof dshSettings.SettingsForms === "function";
+const legacyInstall = typeof dshSettings.installSettingsSection === "function";
 
 // --- minimal cordis ctx mock ---
 function createCtx(services = {}) {
@@ -61,7 +67,22 @@ function createSettings(initial = {}) {
 	const documents = new Map();
 	let revision = 1;
 	const watchers = new Set();
+	const ownerListeners = new Map();
+	const ownerContext = {
+		on(event, fn) {
+			if (!ownerListeners.has(event)) ownerListeners.set(event, []);
+			ownerListeners.get(event).push(fn);
+			return () => {
+				const list = ownerListeners.get(event) ?? [];
+				list.splice(list.indexOf(fn), 1);
+			};
+		},
+		emit(event, ...args) {
+			for (const fn of ownerListeners.get(event) ?? []) fn(...args);
+		}
+	};
 	const service = {
+		ownerContext,
 		writable: true,
 		documentPath: "/fake/settings.yaml",
 		register(ns, schema, options) {
@@ -76,20 +97,16 @@ function createSettings(initial = {}) {
 				}
 			};
 		},
-		installSection(owner, ns, schema, entry, hooks) {
-			const key = String(ns);
-			if (!documents.has(key)) documents.set(key, { value: {}, base: entry, revision: revision++ });
-			const scope = {
-				get: () => ({ ...entry, ...documents.get(key).value })
-			};
-			hooks.setSource(() => scope.get());
-			hooks.onChange();
-		},
 		async replace(ns, section) {
 			const key = String(ns);
-			if (!documents.has(key)) throw new Error(`unknown namespace ${key}`);
+			if (!documents.has(key)) {
+				// Forms hosts derive namespaces from active config entries; the
+				// plugin entry exists even before its first write.
+				documents.set(key, { value: {}, base: {}, revision: revision++ });
+			}
 			documents.set(key, { ...documents.get(key), value: section, revision: revision++ });
 			for (const fn of watchers) fn();
+			ownerContext.emit("settings/document-updated", key);
 		},
 		describe() {
 			return [...documents.entries()].map(([ns, doc]) => ({
@@ -102,6 +119,15 @@ function createSettings(initial = {}) {
 			}));
 		}
 	};
+	if (!formsHost && !legacyInstall) {
+		// dsh 0.1.2–0.1.6: SettingsProvider.installSection is the registration door.
+		service.installSection = (owner, ns, schema, entry, hooks) => {
+			const scope = service.register(ns, schema, { base: entry });
+			hooks.setSource(() => scope.get());
+			hooks.onChange();
+			scope.watch(() => hooks.onChange());
+		};
+	}
 	return service;
 }
 
@@ -112,6 +138,9 @@ function createAgents(map) {
 function createGoals(activeIds) {
 	const set = new Set(activeIds);
 	return {
+		get(agent) {
+			return set.has(agent.id) ? { phase: "active", activation: "armed" } : void 0;
+		},
 		view(agent) {
 			return set.has(agent.id) ? { phase: "active", activation: "armed" } : void 0;
 		}
@@ -133,7 +162,11 @@ function fakeAgent(id, overrides = {}) {
 	return {
 		id,
 		options: overrides.options ?? {},
-		session: { header: overrides.header ?? {}, append: overrides.append ?? (() => {}) },
+		session: {
+			header: overrides.header ?? {},
+			requestHeader: overrides.requestHeader ?? (() => void 0),
+			append: overrides.append ?? (() => {})
+		},
 		ctx: { on: () => () => {} }
 	};
 }
@@ -204,6 +237,13 @@ const agentDefaultModel = {
 			model: value.model ?? "deepseek-v4-flash",
 			...(value.reasoningEffort !== void 0 ? { reasoningEffort: value.reasoningEffort } : {})
 		};
+	},
+	async saveSelection(next) {
+		await settings.replace("agent-default-model", {
+			provider: next.provider,
+			model: next.model,
+			...(next.reasoningEffort === void 0 ? {} : { reasoningEffort: String(next.reasoningEffort) })
+		});
 	}
 };
 const { ctx, listeners, routes } = createCtx({ settings, agents, goals, llm, agentDefaultModel });
@@ -314,7 +354,11 @@ await settings.replace("model-settings", {
 
 // --- 4) /apply-current endpoint: session override lives on the root interceptor ---
 {
-	const agent = fakeAgent("session-live", { options: { provider: "kimi-coding", model: "k3-256k" } });
+	let appended;
+	const agent = fakeAgent("session-live", {
+		options: { provider: "kimi-coding", model: "k3-256k" },
+		append: (type, data) => { appended = { type, data }; }
+	});
 	const liveCtx = createCtx({ settings, agents: createAgents(new Map([["session-live", agent]])), goals, llm, agentDefaultModel });
 	apply(liveCtx.ctx, {});
 	const applyRoute = liveCtx.routes.get("/api/model-settings/apply-current");
@@ -328,6 +372,9 @@ await settings.replace("model-settings", {
 	let resolved = await waterfall[0]({ agent }, async () => ({ provider: "kimi-coding", model: "k3-256k" }));
 	assert.equal(resolved.provider, "deepseek-official", "session override provider");
 	assert.equal(resolved.model, "deepseek-v4", "session override model");
+	assert.equal(appended?.type, "request/header", "session override writes a request/header");
+	assert.equal(appended?.data?.header?.config?.provider, "deepseek-official", "header config carries the new provider");
+	assert.equal(appended?.data?.header?.tools, void 0, "header omits an empty tools list");
 
 	// another session untouched
 	const other = fakeAgent("other", { options: { provider: "kimi-coding", model: "k3-256k" } });

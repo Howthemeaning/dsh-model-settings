@@ -1,7 +1,7 @@
 {
   "name": "dsh-model-settings",
-  "version": "0.1.1",
-  "description": "模型设置面板：统一设置主模型、子代理、goal 回合的模型与推理强度，保存即热更新（dsh sidebar footer action）",
+  "version": "0.2.0",
+  "description": "模型设置面板：统一设置主模型、子代理、goal 回合的模型与推理强度，保存即热更新（兼容最新 dsh 0.2.1-rc.2 / DSH NEXT，并向下兼容 0.1.x）",
   "private": true,
   "type": "module",
   "main": "lib/index.js",
@@ -44,14 +44,14 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-llm": ">=0.0.1-rc.1 <0.2.0",
-    "@deepseek-ai/dsh-settings": ">=0.0.1-rc.1 <0.2.0",
-    "@deepseek-ai/schemastery": ">=0.0.1-rc.1 <0.2.0"
+    "@deepseek-ai/dsh-llm": ">=0.0.1-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-settings": ">=0.0.1-rc.1 <0.3.0",
+    "@deepseek-ai/schemastery": ">=3.18.1 <4.0.0"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepack": "npm run build",
-    "check": "npm run build && node test/smoke.mjs"
+    "check": "npm run build && node test/smoke.mjs && node test/client-smoke.mjs"
   },
   "license": "MIT"
 }

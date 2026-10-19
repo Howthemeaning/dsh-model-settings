@@ -55,20 +55,29 @@ Each slot sets its own **provider / model / reasoning effort**, or follows the d
 
 ## Compatibility
 
-- The current code targets the new dsh-settings API (`SettingsProvider` / `ctx.settings.installSection`) and has been verified on dsh **0.1.5-rc.2** (plugin loads cleanly and the `/api/model-settings/state` endpoints work).
-- If your dsh is older (`@deepseek-ai/dsh-settings` still exports `settingsNamespace` / `installSettingsSection`), use version **0.1.0** of this plugin instead.
+**The latest `@deepseek-ai/dsh` is `0.2.1-rc.2`, exactly the kernel DSH NEXT 2.0.19-next runs — that is the primary target**: `SettingsForms` + volatile Config, verified with a real host boot and a real browser. Older versions are additive compatibility, not the main path.
+
+The host half never statically imports a named helper from one `dsh-settings` generation; it picks the available integration at runtime. The client half falls back across both icon naming schemes:
+
+| dsh version | settings integration | Icon exports | Status |
+| --- | --- | --- | --- |
+| **`0.1.7`–`0.2.x` (incl. latest `0.2.1-rc.2`)** | `SettingsForms` + volatile Config | `Icon*Regular/Medium` | **Primary, verified** |
+| `0.1.2`–`0.1.6` | `SettingsProvider.installSection` | `Icon*16` | Supported |
+| `0.0.1`–`0.1.1` | `installSettingsSection` + `settingsNamespace` | `Icon*16` | Supported |
+
+Verified on `dsh 0.0.1-rc.1`, `0.1.0-rc.7`, `0.1.5-rc.2`, `0.1.7-rc.2`, and `0.2.1-rc.2` (DSH NEXT 2.0.19-next); the latest `0.2.1-rc.2` was also booted as a real web profile with `state` / `save` / clear-overrides / restart-restore exercised end to end, and the panel was opened in a real browser without console errors.
 
 ## Requirements
 
-- **dsh web profile**: the panel is web-side UI (`dsh.client.platform: "web"`) and only loads under a web profile.
+- **dsh Web UI**: the panel is web-side UI (`dsh.client.platform: "web"`), loaded by both a web profile and the DSH NEXT desktop app (which hosts the same web client).
 - **Peer dependencies**:
 
   | Package | Range |
   | --- | --- |
   | `@deepseek-ai/cordis` | `^4.0.1` |
-  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.2.0` |
-  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.2.0` |
-  | `@deepseek-ai/schemastery` | `>=0.0.1-rc.1 <0.2.0` |
+  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.3.0` |
+  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.3.0` |
+  | `@deepseek-ai/schemastery` | `>=3.18.1 <4.0.0` |
 
 - **Required host services**: `agents`, `webServer` (server side); `slots`, `locale` (client side).
 - **Optional services** — when absent the matching capability degrades instead of crashing:
@@ -82,7 +91,7 @@ Each slot sets its own **provider / model / reasoning effort**, or follows the d
 
 ## Installation
 
-### Standard install (recommended)
+### Web edition (dsh 0.1.x / standalone web profile)
 
 ```bash
 # Install from GitHub
@@ -91,19 +100,26 @@ dsh plugin --profile web add github:Howthemeaning/dsh-model-settings
 
 `dsh plugin` installs the package into the profile and automatically appends `dsh-model-settings` to the `dsh.profile.bundles` layer (the package declares `dsh.bundle.patch`). **Restart dsh** for it to take effect.
 
+### DSH NEXT desktop (0.2.x)
+
+DSH NEXT's `desktop` profile is managed by the Electron app and its CLI rejects `--profile desktop`. Open **Plugins → Add plugin → Install a third-party plugin** in the sidebar, enter `github:Howthemeaning/dsh-model-settings` (a local directory also works), then restart the client.
+
+Manual route for local debugging only: place the package at `~/.dsh/profiles/desktop/node_modules/dsh-model-settings`, add `dsh-model-settings` to both `dependencies` and `dsh.profile.bundles` in `~/.dsh/profiles/desktop/package.json`, then restart DSH NEXT. The desktop app may rewrite this profile, so prefer the Plugins page for day-to-day use.
+
 ### Uninstall
 
 ```bash
+# Web edition
 dsh plugin --profile web remove dsh-model-settings
 ```
 
-Or manually: remove `dsh-model-settings` from both the `dsh.profile.bundles` array and `dependencies` in `~/.dsh/profiles/web/package.json`, then delete `~/.dsh/profiles/web/node_modules/dsh-model-settings`.
+On DSH NEXT, uninstall from the sidebar **Plugins** page; for a manual install, remove `dsh-model-settings` from both the `dsh.profile.bundles` array and `dependencies` in `~/.dsh/profiles/desktop/package.json`, then delete `~/.dsh/profiles/desktop/node_modules/dsh-model-settings`.
 
 ## Configuration
 
 Day to day, just open the panel — it writes the settings *user* layer, which takes precedence over the defaults below.
 
-To pre-seed defaults at deploy time (say, pinning every subagent to a cheaper model across a team), override this plugin's `config` with an `update` entry in the profile's `~/.dsh/profiles/web/cordis.patch.yml`:
+To pre-seed defaults at deploy time (say, pinning every subagent to a cheaper model across a team), override this plugin's `config` with an `update` entry in the profile's `~/.dsh/profiles/<profile>/cordis.patch.yml` (`web` for the web edition, `desktop` for DSH NEXT):
 
 ```yaml
 - update:
@@ -131,7 +147,7 @@ The main-model slot is not configured here — it writes the `agent-default-mode
 
 This package is hand-written ESM with no build step: `lib/index.js` is the host half, `lib/client.js` the browser half (a hand-written `__ModuleLoader__` bundle with the CSS inlined).
 
-The peer dependencies ship with the dsh CLI, so point `node_modules` at them for local work:
+The peer dependencies ship with dsh; point `node_modules` at the matching dsh installation for local work, and swap it to run the compatibility matrix against 0.0.1 / 0.1.x / 0.2.x:
 
 ```bash
 ln -sfn "$(npm root -g)/@deepseek-ai/dsh/node_modules" node_modules
@@ -141,14 +157,14 @@ npm run check
 | Command | What it does |
 | --- | --- |
 | `npm run build` | Verifies every published artifact exists and `node --check`s both js files (no transpile) |
-| `npm run check` | `build`, then `test/smoke.mjs` |
+| `npm run check` | `build`, then `test/smoke.mjs` and `test/client-smoke.mjs` |
 
-`test/smoke.mjs` mocks a minimal cordis ctx and covers the `agent/request` slot precedence plus all three endpoints. Two more scripts are investigation tools, not part of `check`: `test/read-log.mjs` decompresses a session log and prints its `request/header` entries, and `test/render-debug.mjs` force-renders the panel under node to reproduce crashes.
+`test/smoke.mjs` mocks a minimal cordis ctx and covers the `agent/request` slot precedence plus all three endpoints; it picks the 0.0.1 / 0.1.x / 0.2.x integration automatically from the installed `dsh-settings` exports. `test/client-smoke.mjs` loads the client bundle with both the old `Icon*16` and the new `Icon*Regular/Medium` primitives, so a missing icon cannot silently break the first render. Two more scripts are investigation tools, not part of `check`: `test/read-log.mjs` decompresses a session log and prints its `request/header` entries, and `test/render-debug.mjs` force-renders the panel under node to reproduce crashes.
 
 After editing `lib/client.js`, sync it to the installed copy and hard-reload the page to see the change (the CSS is injected into a `<style>` tag on first load; no dsh restart needed):
 
 ```bash
-cp lib/client.js ~/.dsh/profiles/web/node_modules/dsh-model-settings/lib/client.js
+cp lib/client.js ~/.dsh/profiles/<profile>/node_modules/dsh-model-settings/lib/client.js
 ```
 
 ## License

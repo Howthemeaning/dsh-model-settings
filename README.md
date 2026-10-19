@@ -51,20 +51,29 @@
 
 ## 兼容性
 
-- 当前代码适配新版 dsh-settings API（`SettingsProvider` / `ctx.settings.installSection`），已在 dsh **0.1.5-rc.2** 上实测通过（插件可正常加载，`/api/model-settings/state` 等端点工作正常）。
-- 如果你的 dsh 较旧（`@deepseek-ai/dsh-settings` 仍导出 `settingsNamespace` / `installSettingsSection`），请使用本插件 **0.1.0** 的代码。
+**当前最新的 `@deepseek-ai/dsh` 是 `0.2.1-rc.2`，和 DSH NEXT 2.0.19-next 的内核完全一致，这是主目标路径**：`SettingsForms` + volatile Config，已用真实 host 启动和真实浏览器验证。旧版本是附加兼容，不影响最新版。
+
+宿主侧不静态依赖某一代 `dsh-settings` 的具名导出，而是按运行时能力选择接入方式；客户端图标也做了新旧名字回退：
+
+| dsh 版本 | settings 接入 | 图标导出 | 状态 |
+| --- | --- | --- | --- |
+| **`0.1.7`–`0.2.x`（含最新 `0.2.1-rc.2`）** | `SettingsForms` + volatile Config | `Icon*Regular/Medium` | **主路径，已验证** |
+| `0.1.2`–`0.1.6` | `SettingsProvider.installSection` | `Icon*16` | 兼容 |
+| `0.0.1`–`0.1.1` | `installSettingsSection` + `settingsNamespace` | `Icon*16` | 兼容 |
+
+已在 `dsh 0.0.1-rc.1`、`0.1.0-rc.7`、`0.1.5-rc.2`、`0.1.7-rc.2`、`0.2.1-rc.2`（DSH NEXT 2.0.19-next）上验证；最新 `0.2.1-rc.2` 还用真实 web profile 启动，调通了 `state` / `save` / 清除覆盖 / 重启恢复，并在真实浏览器里确认面板打开无报错。
 
 ## 环境要求
 
-- **dsh web profile**：面板是 web 端 UI（`dsh.client.platform: "web"`），只在 web profile 下加载。
+- **dsh Web UI**：面板是 web 端 UI（`dsh.client.platform: "web"`），web profile 和 DSH NEXT 桌面端（同样跑 web 客户端）都加载。
 - **peer 依赖**：
 
   | 包 | 版本范围 |
   | --- | --- |
   | `@deepseek-ai/cordis` | `^4.0.1` |
-  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.2.0` |
-  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.2.0` |
-  | `@deepseek-ai/schemastery` | `>=0.0.1-rc.1 <0.2.0` |
+  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.3.0` |
+  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.3.0` |
+  | `@deepseek-ai/schemastery` | `>=3.18.1 <4.0.0` |
 
 - **必需的宿主服务**：`agents`、`webServer`（服务端），`slots`、`locale`（客户端）。
 - **可选服务**，缺失时对应能力降级而不是崩溃：
@@ -78,7 +87,7 @@
 
 ## 安装
 
-### 标准安装（推荐）
+### Web 版（dsh 0.1.x / 独立 web profile）
 
 ```bash
 # 从 GitHub 安装
@@ -87,19 +96,26 @@ dsh plugin --profile web add github:Howthemeaning/dsh-model-settings
 
 `dsh plugin` 会把包安装进 profile 并自动把 `dsh-model-settings` 加入 `dsh.profile.bundles` 层（因为本包声明了 `dsh.bundle.patch`）。**重启 dsh** 后生效。
 
+### DSH NEXT 桌面端（0.2.x）
+
+DSH NEXT 的 `desktop` profile 由 Electron 客户端管理，CLI 会拒绝 `--profile desktop`。打开侧边栏 **插件 → 添加插件 → 安装第三方插件**，填入 `github:Howthemeaning/dsh-model-settings`（也支持本机目录），然后重启客户端。
+
+仅用于本地调试的手动方式：把包放进 `~/.dsh/profiles/desktop/node_modules/dsh-model-settings`，并把 `dsh-model-settings` 同时加入 `~/.dsh/profiles/desktop/package.json` 的 `dependencies` 和 `dsh.profile.bundles`，再重启 DSH NEXT。桌面端可能重写这个 profile，日常安装仍建议走客户端插件页。
+
 ### 卸载
 
 ```bash
+# Web 版
 dsh plugin --profile web remove dsh-model-settings
 ```
 
-或手动：从 `~/.dsh/profiles/web/package.json` 的 `dsh.profile.bundles` 数组和 `dependencies` 里删掉 `dsh-model-settings`，再删除 `~/.dsh/profiles/web/node_modules/dsh-model-settings`。
+DSH NEXT 在侧边栏 **插件** 页卸载；手动安装的则从 `~/.dsh/profiles/desktop/package.json` 的 `dsh.profile.bundles` 和 `dependencies` 里删掉 `dsh-model-settings`，再删除 `~/.dsh/profiles/desktop/node_modules/dsh-model-settings`。
 
 ## 配置项
 
 日常使用直接开面板即可 —— 面板保存写的是 settings 的用户层，优先级高于下面这些默认值。
 
-如果要在部署时预置默认值（例如团队统一把子代理钉在便宜的模型上），在 profile 的 `~/.dsh/profiles/web/cordis.patch.yml` 里用 `update` 覆盖本插件的 `config`：
+如果要在部署时预置默认值（例如团队统一把子代理钉在便宜的模型上），在 profile 的 `~/.dsh/profiles/<profile>/cordis.patch.yml` 里用 `update` 覆盖本插件的 `config`（Web 版是 `web`，DSH NEXT 是 `desktop`）：
 
 ```yaml
 - update:
@@ -127,7 +143,7 @@ dsh plugin --profile web remove dsh-model-settings
 
 本包是手写 ESM，没有编译步骤：`lib/index.js` 是宿主侧，`lib/client.js` 是浏览器侧（手写 `__ModuleLoader__` bundle，CSS 内联其中）。
 
-peer 依赖由 dsh CLI 自带，本地开发把 `node_modules` 指过去即可：
+peer 依赖由 dsh 自带，本地开发把 `node_modules` 指到对应版本的 dsh 安装目录即可；跑兼容性矩阵时分别指向 0.0.1 / 0.1.x / 0.2.x 的 `node_modules`：
 
 ```bash
 ln -sfn "$(npm root -g)/@deepseek-ai/dsh/node_modules" node_modules
@@ -137,14 +153,14 @@ npm run check
 | 命令 | 作用 |
 | --- | --- |
 | `npm run build` | 校验发布产物齐全，并用 `node --check` 过一遍两个 js（无 transpile） |
-| `npm run check` | `build` 之后跑 `test/smoke.mjs` |
+| `npm run check` | `build` 之后跑 `test/smoke.mjs` 和 `test/client-smoke.mjs` |
 
-`test/smoke.mjs` mock 一个最小 cordis ctx，覆盖 `agent/request` 的档位优先级与三个端点。另外两个是排查工具，不在 check 里：`test/read-log.mjs` 解压并打印会话日志的 `request/header`，`test/render-debug.mjs` 在 node 里强制渲染面板以复现崩溃。
+`test/smoke.mjs` mock 一个最小 cordis ctx，覆盖 `agent/request` 的档位优先级与三个端点；它会按当前 `dsh-settings` 的导出自动走 0.0.1 / 0.1.x / 0.2.x 对应的接入路径。`test/client-smoke.mjs` 分别用旧 `Icon*16` 和新 `Icon*Regular/Medium` 的 primitives 加载客户端 bundle，防止面板注册成功但首次渲染因图标缺失崩溃。另外两个是排查工具，不在 check 里：`test/read-log.mjs` 解压并打印会话日志的 `request/header`，`test/render-debug.mjs` 在 node 里强制渲染面板以复现崩溃。
 
 改完 `lib/client.js` 后，把文件同步到已安装副本并硬刷新页面才能看到效果（CSS 在首次加载时注入 `<style>`，但不需要重启 dsh）：
 
 ```bash
-cp lib/client.js ~/.dsh/profiles/web/node_modules/dsh-model-settings/lib/client.js
+cp lib/client.js ~/.dsh/profiles/<profile>/node_modules/dsh-model-settings/lib/client.js
 ```
 
 ## License

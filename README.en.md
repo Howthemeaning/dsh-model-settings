@@ -75,9 +75,12 @@ Verified on `dsh 0.0.1-rc.1`, `0.1.0-rc.7`, `0.1.5-rc.2`, `0.1.7-rc.2`, and `0.2
   | Package | Range |
   | --- | --- |
   | `@deepseek-ai/cordis` | `^4.0.1` |
-  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.3.0` |
-  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.3.0` |
+  | `@deepseek-ai/dsh-llm` | `0.0.1-rc.1`–`0.2.x` (prereleases included, explicit branches) |
+  | `@deepseek-ai/dsh-settings` | `0.0.1-rc.1`–`0.2.x` (prereleases included, explicit branches) |
   | `@deepseek-ai/schemastery` | `>=3.18.1 <4.0.0` |
+
+  The full `dsh-llm` / `dsh-settings` ranges live in `package.json`: plain semver would not let a prerelease match `<0.3.0`, so the range uses one `||` branch per patch line; the latest `0.2.1-rc.2` is covered.
+
 
 - **Required host services**: `agents`, `webServer` (server side); `slots`, `locale` (client side).
 - **Optional services** — when absent the matching capability degrades instead of crashing:
@@ -166,6 +169,16 @@ After editing `lib/client.js`, sync it to the installed copy and hard-reload the
 ```bash
 cp lib/client.js ~/.dsh/profiles/<profile>/node_modules/dsh-model-settings/lib/client.js
 ```
+
+## Publishing to the plugin market
+
+The market catalog comes from [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin), not from the dsh-market application repository. To publish:
+
+1. Add the `dsh-plugin` topic to this repository (CI checks it).
+2. Add `data/plugins/Howthemeaning__dsh-model-settings.yml` to the awesome repository. Submit only that file; do not hand-edit the generated READMEs.
+3. Open the PR. After it merges, the site and dsh-market index it automatically, usually within a day.
+
+`docs/dsh-model-settings.png` is declared in the repository's `screenshots.json` for the market detail page; see `contributing.md` in the awesome repository for the format.
 
 ## License
 

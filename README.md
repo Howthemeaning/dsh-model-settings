@@ -71,9 +71,12 @@
   | 包 | 版本范围 |
   | --- | --- |
   | `@deepseek-ai/cordis` | `^4.0.1` |
-  | `@deepseek-ai/dsh-llm` | `>=0.0.1-rc.1 <0.3.0` |
-  | `@deepseek-ai/dsh-settings` | `>=0.0.1-rc.1 <0.3.0` |
+  | `@deepseek-ai/dsh-llm` | `0.0.1-rc.1`–`0.2.x`（含预发布，显式分支） |
+  | `@deepseek-ai/dsh-settings` | `0.0.1-rc.1`–`0.2.x`（含预发布，显式分支） |
   | `@deepseek-ai/schemastery` | `>=3.18.1 <4.0.0` |
+
+  `dsh-llm` / `dsh-settings` 的完整范围在 `package.json`：普通 semver 不会让预发布版本命中 `<0.3.0`，所以按 patch 版本逐段写了 `||` 分支；最新 `0.2.1-rc.2` 也在范围内。
+
 
 - **必需的宿主服务**：`agents`、`webServer`（服务端），`slots`、`locale`（客户端）。
 - **可选服务**，缺失时对应能力降级而不是崩溃：
@@ -162,6 +165,16 @@ npm run check
 ```bash
 cp lib/client.js ~/.dsh/profiles/<profile>/node_modules/dsh-model-settings/lib/client.js
 ```
+
+## 发布到插件市场
+
+市场目录来自 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)，不是 dsh-market 应用仓库。发布步骤：
+
+1. 给本仓库加 `dsh-plugin` topic（CI 会检查）。
+2. 在 awesome 仓库的 `data/plugins/` 新增 `Howthemeaning__dsh-model-settings.yml`，只提交这一个文件，不要手改生成的 README。
+3. 提 PR；合并后站点和 dsh-market 会自动收录，通常一天内生效。
+
+仓库根的 `screenshots.json` 声明市场详情页截图；字段格式见 awesome 仓库的 `contributing.md`。
 
 ## License
 
